@@ -94,6 +94,36 @@ CI workflow (`.github/workflows/ci.yml`) runs on push/PR/manual dispatch and inc
 - `backend` job: Ruff lint + pytest unit tests
 - `frontend-e2e` job: Playwright E2E against running backend + MongoDB service
 
+## Railway Preview (No Agents)
+
+Use this when you want to validate preview deployments end-to-end manually first.
+
+1. Install Railway CLI and log in:
+
+```bash
+railway login
+```
+
+2. Run preview deploy + checks:
+
+```bash
+./scripts/railway_preview_e2e.sh
+```
+
+What this script does:
+
+- Creates a Railway project if the repo is not linked yet.
+- Deploys the `web` service from this repo using the root `Dockerfile`.
+- Creates or resolves a Railway-provided domain.
+- Verifies `/healthz`.
+- Runs Playwright E2E against the deployed URL (`RUN_PLAYWRIGHT=1` by default).
+
+Useful overrides:
+
+- `RUN_PLAYWRIGHT=0 ./scripts/railway_preview_e2e.sh` to skip remote E2E.
+- `RAILWAY_PROJECT_NAME=your-name ./scripts/railway_preview_e2e.sh` to control project name on first run.
+- `RAILWAY_WEB_SERVICE_NAME=web ./scripts/railway_preview_e2e.sh` to target a specific service name.
+
 ## Modal Preview Deployments
 
 This template includes `.github/workflows/preview-modal.yml` for per-push PR previews on Modal.
