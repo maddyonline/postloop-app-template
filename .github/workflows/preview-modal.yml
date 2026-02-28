@@ -120,6 +120,9 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_BASE_URL: ""
+          VITE_PREVIEW_COMMIT: ${{ github.sha }}
+          VITE_PREVIEW_RUN_ID: ${{ github.run_id }}
+          VITE_PREVIEW_APP: ${{ env.MODAL_APP_NAME }}
         run: |
           npm ci
           npm run build

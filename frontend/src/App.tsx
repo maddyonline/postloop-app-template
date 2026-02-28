@@ -8,6 +8,9 @@ type Note = {
 }
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000'
+const PREVIEW_COMMIT = ((import.meta.env.VITE_PREVIEW_COMMIT as string | undefined) ?? '').trim()
+const PREVIEW_RUN_ID = ((import.meta.env.VITE_PREVIEW_RUN_ID as string | undefined) ?? '').trim()
+const PREVIEW_APP = ((import.meta.env.VITE_PREVIEW_APP as string | undefined) ?? '').trim()
 
 export default function App() {
   const [notes, setNotes] = useState<Note[]>([])
@@ -73,10 +76,16 @@ export default function App() {
   }
 
   const openCount = useMemo(() => notes.filter((note) => !note.done).length, [notes])
+  const previewCommitShort = PREVIEW_COMMIT ? PREVIEW_COMMIT.slice(0, 7) : 'local'
 
   return (
     <main className="container" data-testid="app-root">
       <h1>Starter Notes App</h1>
+      <p className="preview-meta" data-testid="preview-meta">
+        <strong>Build:</strong> {previewCommitShort}
+        {PREVIEW_RUN_ID ? ` • run ${PREVIEW_RUN_ID}` : ''}
+        {PREVIEW_APP ? ` • ${PREVIEW_APP}` : ''}
+      </p>
       <p>Open notes: {openCount}</p>
 
       <form onSubmit={createNote}>

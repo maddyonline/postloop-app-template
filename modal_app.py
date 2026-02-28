@@ -41,7 +41,7 @@ image = (
 app = modal.App("postloop-notes-preview")
 
 
-@app.function(image=image, timeout=900)
+@app.function(image=image, timeout=900, min_containers=1)
 @modal.asgi_app()
 def web():
     from fastapi import HTTPException

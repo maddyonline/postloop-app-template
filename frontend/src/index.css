@@ -30,6 +30,17 @@ p {
   margin: 0 0 16px;
 }
 
+.preview-meta {
+  display: inline-block;
+  font-size: 13px;
+  color: #35516d;
+  background: #f1f7ff;
+  border: 1px solid #cfe0f6;
+  border-radius: 999px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+}
+
 form {
   display: flex;
   gap: 12px;

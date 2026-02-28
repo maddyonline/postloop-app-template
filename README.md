@@ -118,9 +118,11 @@ Optional repository variable:
 Notes:
 
 - `modal_app.py` serves backend APIs and frontend static assets from one Modal endpoint.
+- The Modal web function is configured with `min_containers=1` to keep previews warm.
 - Frontend bundle must exist at `frontend/dist` before deploy; workflow handles this build step automatically.
 - Modal plan endpoint limits apply (for example, free tier caps deployed web endpoints), so stale previews should be cleaned up.
 - Preview URLs are unique per push because app names include the commit short SHA.
+- UI includes a build badge (`Build: <shortsha> • run <run-id> • <app-name>`) so each push is visibly distinct.
 - Remote E2E can also be run manually with:
 
 ```bash
