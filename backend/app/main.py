@@ -6,19 +6,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 from .models import NoteCreate, NoteRead
-from .repository import MongoNoteRepository, NoteRepository
+from .repository import InMemoryNoteRepository, MongoNoteRepository, NoteRepository
 
 
 def _build_default_repo() -> tuple[NoteRepository, MongoClient | None]:
     mongo_url = os.getenv("MONGO_URL", "mongodb://127.0.0.1:27017")
     db_name = os.getenv("MONGO_DB_NAME", "postloop_notes")
 
-    client = MongoClient(mongo_url, serverSelectionTimeoutMS=3000)
-    client.admin.command("ping")
-    collection = client[db_name]["notes"]
-    return MongoNoteRepository(collection), client
+    try:
+        client = MongoClient(mongo_url, serverSelectionTimeoutMS=3000)
+        client.admin.command("ping")
+        collection = client[db_name]["notes"]
+        return MongoNoteRepository(collection), client
+    except PyMongoError:
+        # Keep local/unit-test startup resilient when Mongo is not available yet.
+        return InMemoryNoteRepository(), None
 
 
 def create_app(repo: NoteRepository | None = None) -> FastAPI:
