@@ -1,0 +1,94 @@
+name: Sweep Preview Environments (Railway)
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_WEB_SERVICE: ${{ vars.RAILWAY_WEB_SERVICE }}
+      PREVIEW_TTL_HOURS: ${{ vars.PREVIEW_TTL_HOURS }}
+    steps:
+      - name: Validate Railway configuration
+        shell: bash
+        run: |
+          missing=()
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then missing+=("RAILWAY_API_TOKEN secret"); fi
+          if [ -z "${RAILWAY_PROJECT_ID:-}" ]; then missing+=("RAILWAY_PROJECT_ID variable"); fi
+          if [ -z "${RAILWAY_WEB_SERVICE:-}" ]; then missing+=("RAILWAY_WEB_SERVICE variable"); fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing Railway config: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Link Railway project
+        run: railway link -p "$RAILWAY_PROJECT_ID"
+
+      - name: Sweep old preview environments
+        shell: bash
+        run: |
+          TTL_HOURS="${PREVIEW_TTL_HOURS:-4}"
+          echo "TTL hours: $TTL_HOURS"
+
+          mapfile -t ENVS < <(railway status --json | jq -r '.environments.edges[].node.name' | grep '^preview-pr-' || true)
+          if [ "${#ENVS[@]}" -eq 0 ]; then
+            echo "No preview environments found."
+            exit 0
+          fi
+
+          for env_name in "${ENVS[@]}"; do
+            echo "Inspecting $env_name"
+            DEPLOYMENTS_JSON="$(railway deployment list -s "$RAILWAY_WEB_SERVICE" -e "$env_name" --json 2>/dev/null || echo '[]')"
+            LAST_DEPLOY_AT="$(echo "$DEPLOYMENTS_JSON" | jq -r '.[0].createdAt // ""')"
+
+            if [ -z "$LAST_DEPLOY_AT" ]; then
+              echo "No deployment found for $env_name; skipping."
+              continue
+            fi
+
+            AGE_HOURS="$(python3 - "$LAST_DEPLOY_AT" <<'PY'
+import datetime
+import sys
+
+last = sys.argv[1].strip()
+if last.endswith("Z"):
+    last = last[:-1] + "+00:00"
+dt = datetime.datetime.fromisoformat(last)
+now = datetime.datetime.now(datetime.timezone.utc)
+age = (now - dt).total_seconds() / 3600.0
+print(f"{age:.2f}")
+PY
+)"
+
+            echo "Last deploy: $LAST_DEPLOY_AT (${AGE_HOURS}h ago)"
+            should_delete="$(python3 - "$AGE_HOURS" "$TTL_HOURS" <<'PY'
+import sys
+age = float(sys.argv[1])
+ttl = float(sys.argv[2])
+print("1" if age >= ttl else "0")
+PY
+)"
+
+            if [ "$should_delete" = "1" ]; then
+              echo "Deleting stale preview environment: $env_name"
+              railway environment delete "$env_name" -y || true
+            else
+              echo "Keeping $env_name"
+            fi
+          done

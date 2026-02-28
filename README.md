@@ -136,32 +136,34 @@ railway variables -s web \
   --set 'MONGO_DB_NAME=postloop_notes'
 ```
 
-## Modal Preview Deployments
+## Railway Preview Deployments
 
-This template includes `.github/workflows/preview-modal.yml` for per-push PR previews on Modal.
+This template includes two Railway preview workflows:
+
+- `.github/workflows/preview-railway.yml`
+- `.github/workflows/preview-railway-sweeper.yml`
 
 Behavior:
 
-1. On PR `opened/synchronize/reopened`, workflow builds frontend, deploys `modal_app.py`, and updates one stable app name per PR (`postloop-preview-pr-<number>`).
-2. It resolves the preview URL and posts/updates a PR comment with that URL.
-3. It runs Playwright E2E against the deployed preview (`PLAYWRIGHT_BASE_URL=<preview-url>`).
-4. On PR `closed`, it stops the corresponding Modal app.
+1. On PR `opened/synchronize/reopened`, preview workflow ensures environment `preview-pr-<number>` exists, deploys the app, resolves preview URL, runs Playwright smoke test, and updates a sticky PR comment.
+2. On PR `closed`, preview workflow deletes the matching Railway environment.
+3. Sweeper workflow runs every 30 minutes and deletes preview environments whose latest deployment is older than `PREVIEW_TTL_HOURS` (default `4`).
 
-Required repository secrets:
+Required repository secret:
 
-- `MODAL_TOKEN_ID`
-- `MODAL_TOKEN_SECRET`
+- `RAILWAY_API_TOKEN`
 
-Optional repository variable:
+Required repository variables:
 
-- `MODAL_ENVIRONMENT` (if you use a non-default Modal environment)
+- `RAILWAY_PROJECT_ID`
+- `RAILWAY_WEB_SERVICE`
 
-Notes:
+Optional repository variables:
 
-- `modal_app.py` serves backend APIs and frontend static assets from one Modal endpoint.
-- Frontend bundle must exist at `frontend/dist` before deploy; workflow handles this build step automatically.
-- Modal plan endpoint limits apply (for example, free tier caps deployed web endpoints), so stale previews should be cleaned up.
-- Remote E2E can also be run manually with:
+- `RAILWAY_MONGO_SERVICE` (reserved for explicit DB cleanup automation)
+- `PREVIEW_TTL_HOURS` (default `4`)
+
+Remote E2E can also be run manually with:
 
 ```bash
 cd frontend
