@@ -94,77 +94,32 @@ CI workflow (`.github/workflows/ci.yml`) runs on push/PR/manual dispatch and inc
 - `backend` job: Ruff lint + pytest unit tests
 - `frontend-e2e` job: Playwright E2E against running backend + MongoDB service
 
-## Railway Preview (No Agents)
+## Modal Preview Deployments
 
-Use this when you want to validate preview deployments end-to-end manually first.
-
-1. Install Railway CLI and log in:
-
-```bash
-railway login
-```
-
-2. Run preview deploy + checks:
-
-```bash
-./scripts/railway_preview_e2e.sh
-```
-
-What this script does:
-
-- Creates a Railway project if the repo is not linked yet.
-- Deploys the `web` service from this repo using the root `Dockerfile`.
-- Creates or resolves a Railway-provided domain.
-- Verifies `/healthz`.
-- Runs Playwright E2E against the deployed URL (`RUN_PLAYWRIGHT=1` by default).
-
-Useful overrides:
-
-- `RUN_PLAYWRIGHT=0 ./scripts/railway_preview_e2e.sh` to skip remote E2E.
-- `RAILWAY_PROJECT_NAME=your-name ./scripts/railway_preview_e2e.sh` to control project name on first run.
-- `RAILWAY_WEB_SERVICE_NAME=web ./scripts/railway_preview_e2e.sh` to target a specific service name.
-
-Optional: wire a Railway Mongo service into the preview app:
-
-```bash
-# Add a Mongo service in the linked project (once)
-railway add -d mongo
-
-# If your service name is not "MongoDB", replace it in the reference below
-railway variables -s web \
-  --set 'MONGO_URL=${{MongoDB.MONGO_URL}}' \
-  --set 'MONGO_DB_NAME=postloop_notes'
-```
-
-## Railway Preview Deployments
-
-This template includes two Railway preview workflows:
-
-- `.github/workflows/preview-railway.yml`
-- `.github/workflows/preview-railway-sweeper.yml`
+This template includes `.github/workflows/preview-modal.yml` for per-push PR previews on Modal.
 
 Behavior:
 
-1. On PR `opened/synchronize/reopened`, preview workflow ensures environment `preview-pr-<number>` exists, deploys the app, resolves preview URL, runs Playwright smoke test, and updates a sticky PR comment.
-2. On PR `closed`, preview workflow deletes the matching Railway environment.
-3. Sweeper workflow runs every 30 minutes and deletes preview environments whose latest deployment is older than `PREVIEW_TTL_HOURS` (default `4`).
+1. On PR `opened/synchronize/reopened`, workflow builds frontend, deploys `modal_app.py`, and updates one stable app name per PR (`postloop-preview-pr-<number>`).
+2. It resolves the preview URL and posts/updates a PR comment with that URL.
+3. It runs Playwright E2E against the deployed preview (`PLAYWRIGHT_BASE_URL=<preview-url>`).
+4. On PR `closed`, it stops the corresponding Modal app.
 
-Required repository secret:
+Required repository secrets:
 
-- `RAILWAY_API_TOKEN`
-  - Must be a Railway API token from dashboard token settings (not CLI login/session state).
+- `MODAL_TOKEN_ID`
+- `MODAL_TOKEN_SECRET`
 
-Required repository variables:
+Optional repository variable:
 
-- `RAILWAY_PROJECT_ID`
-- `RAILWAY_WEB_SERVICE`
+- `MODAL_ENVIRONMENT` (if you use a non-default Modal environment)
 
-Optional repository variables:
+Notes:
 
-- `RAILWAY_MONGO_SERVICE` (reserved for explicit DB cleanup automation)
-- `PREVIEW_TTL_HOURS` (default `4`)
-
-Remote E2E can also be run manually with:
+- `modal_app.py` serves backend APIs and frontend static assets from one Modal endpoint.
+- Frontend bundle must exist at `frontend/dist` before deploy; workflow handles this build step automatically.
+- Modal plan endpoint limits apply (for example, free tier caps deployed web endpoints), so stale previews should be cleaned up.
+- Remote E2E can also be run manually with:
 
 ```bash
 cd frontend
