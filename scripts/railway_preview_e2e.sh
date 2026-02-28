@@ -27,6 +27,27 @@ fi
 echo "[railway] ensuring service exists: $WEB_SERVICE_NAME"
 railway add --service "$WEB_SERVICE_NAME" >/dev/null 2>&1 || true
 
+WEB_VARS_JSON="$(railway variables -s "$WEB_SERVICE_NAME" --json 2>/dev/null || echo '{}')"
+HAS_MONGO_URL="$(
+python3 - "$WEB_VARS_JSON" <<'PY'
+import json
+import sys
+
+try:
+    payload = json.loads(sys.argv[1])
+except json.JSONDecodeError:
+    payload = {}
+
+print("1" if payload.get("MONGO_URL") else "0")
+PY
+)"
+
+if [[ "$HAS_MONGO_URL" == "1" ]]; then
+  echo "[railway] web service MONGO_URL is configured"
+else
+  echo "[railway] web service MONGO_URL is not set; app will use in-memory storage"
+fi
+
 echo "[railway] deploying service: $WEB_SERVICE_NAME"
 railway up -s "$WEB_SERVICE_NAME" -c
 

@@ -124,6 +124,18 @@ Useful overrides:
 - `RAILWAY_PROJECT_NAME=your-name ./scripts/railway_preview_e2e.sh` to control project name on first run.
 - `RAILWAY_WEB_SERVICE_NAME=web ./scripts/railway_preview_e2e.sh` to target a specific service name.
 
+Optional: wire a Railway Mongo service into the preview app:
+
+```bash
+# Add a Mongo service in the linked project (once)
+railway add -d mongo
+
+# If your service name is not "MongoDB", replace it in the reference below
+railway variables -s web \
+  --set 'MONGO_URL=${{MongoDB.MONGO_URL}}' \
+  --set 'MONGO_DB_NAME=postloop_notes'
+```
+
 ## Modal Preview Deployments
 
 This template includes `.github/workflows/preview-modal.yml` for per-push PR previews on Modal.
