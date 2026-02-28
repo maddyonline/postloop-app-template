@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/playwright-report/
+frontend/test-results/
+
+# Local data
+.data/
+.dbos/
+*.egg-info/
+
+# Logs / OS
+*.log
+.DS_Store
