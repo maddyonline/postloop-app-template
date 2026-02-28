@@ -6,14 +6,30 @@ from pathlib import Path
 import modal
 
 ROOT = Path(__file__).resolve().parent
-BACKEND_DIR = ROOT / "backend"
-FRONTEND_DIST_DIR = ROOT / "frontend" / "dist"
+LOCAL_BACKEND_DIR = ROOT / "backend"
+LOCAL_FRONTEND_DIST_DIR = ROOT / "frontend" / "dist"
+CONTAINER_BACKEND_DIR = Path("/root/app/backend")
+CONTAINER_FRONTEND_DIST_DIR = Path("/root/app/frontend_dist")
+
+# Modal imports user code again inside the remote container. In that context the
+# project root is not available at /root/<repo>, but the copied dirs exist under
+# /root/app. Resolve source dirs from whichever location exists.
+BACKEND_DIR = (
+    LOCAL_BACKEND_DIR if LOCAL_BACKEND_DIR.exists() else CONTAINER_BACKEND_DIR
+)
+FRONTEND_DIST_DIR = (
+    LOCAL_FRONTEND_DIST_DIR
+    if LOCAL_FRONTEND_DIST_DIR.exists()
+    else CONTAINER_FRONTEND_DIST_DIR
+)
 
 if not FRONTEND_DIST_DIR.exists():
     raise RuntimeError(
         "Missing frontend/dist. Build it before deploy: "
         "`cd frontend && npm ci && VITE_API_BASE_URL= npm run build`"
     )
+if not BACKEND_DIR.exists():
+    raise RuntimeError("Missing backend directory for Modal app packaging.")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
