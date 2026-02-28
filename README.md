@@ -25,7 +25,7 @@ Starter template for rapidly building app products with:
 
 ```bash
 cd backend
-python3 -m pip install -e .[dev]
+python3 -m pip install -e '.[dev]'
 python3 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -45,7 +45,7 @@ Backend lint + tests:
 
 ```bash
 cd backend
-python3 -m pip install -e .[dev]
+python3 -m pip install -e '.[dev]'
 ruff check .
 pytest
 ```
