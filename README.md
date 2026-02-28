@@ -152,6 +152,7 @@ Behavior:
 Required repository secret:
 
 - `RAILWAY_API_TOKEN`
+  - Must be a Railway API token from dashboard token settings (not CLI login/session state).
 
 Required repository variables:
 
