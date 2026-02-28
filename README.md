@@ -93,3 +93,35 @@ CI workflow (`.github/workflows/ci.yml`) runs on push/PR/manual dispatch and inc
 
 - `backend` job: Ruff lint + pytest unit tests
 - `frontend-e2e` job: Playwright E2E against running backend + MongoDB service
+
+## Modal Preview Deployments
+
+This template includes `.github/workflows/preview-modal.yml` for per-push PR previews on Modal.
+
+Behavior:
+
+1. On PR `opened/synchronize/reopened`, workflow builds frontend, deploys `modal_app.py`, and updates one stable app name per PR (`postloop-preview-pr-<number>`).
+2. It resolves the preview URL and posts/updates a PR comment with that URL.
+3. It runs Playwright E2E against the deployed preview (`PLAYWRIGHT_BASE_URL=<preview-url>`).
+4. On PR `closed`, it stops the corresponding Modal app.
+
+Required repository secrets:
+
+- `MODAL_TOKEN_ID`
+- `MODAL_TOKEN_SECRET`
+
+Optional repository variable:
+
+- `MODAL_ENVIRONMENT` (if you use a non-default Modal environment)
+
+Notes:
+
+- `modal_app.py` serves backend APIs and frontend static assets from one Modal endpoint.
+- Frontend bundle must exist at `frontend/dist` before deploy; workflow handles this build step automatically.
+- Modal plan endpoint limits apply (for example, free tier caps deployed web endpoints), so stale previews should be cleaned up.
+- Remote E2E can also be run manually with:
+
+```bash
+cd frontend
+PLAYWRIGHT_BASE_URL="https://<your-preview-url>" npm run test:e2e
+```
