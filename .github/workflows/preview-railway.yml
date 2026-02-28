@@ -108,8 +108,19 @@ jobs:
 
       - name: Install Railway CLI
         if: steps.railway_auth.outputs.configured == 'true'
+        shell: bash
         run: |
-          npm install -g @railway/cli
+          for attempt in 1 2 3; do
+            if npm install -g @railway/cli; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Failed to install Railway CLI after 3 attempts."
+              exit 1
+            fi
+            echo "Retrying Railway CLI install in 5s..."
+            sleep 5
+          done
           railway --version
 
       - name: Resolve preview environment name
@@ -315,7 +326,19 @@ jobs:
 
       - name: Install Railway CLI
         if: steps.railway_auth.outputs.configured == 'true'
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm install -g @railway/cli; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Failed to install Railway CLI after 3 attempts."
+              exit 1
+            fi
+            echo "Retrying Railway CLI install in 5s..."
+            sleep 5
+          done
 
       - name: Link Railway project
         if: steps.railway_auth.outputs.configured == 'true'

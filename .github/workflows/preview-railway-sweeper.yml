@@ -35,7 +35,19 @@ jobs:
           node-version: "20"
 
       - name: Install Railway CLI
-        run: npm install -g @railway/cli
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm install -g @railway/cli; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Failed to install Railway CLI after 3 attempts."
+              exit 1
+            fi
+            echo "Retrying Railway CLI install in 5s..."
+            sleep 5
+          done
 
       - name: Link Railway project
         run: railway link -p "$RAILWAY_PROJECT_ID"
@@ -62,28 +74,10 @@ jobs:
               continue
             fi
 
-            AGE_HOURS="$(python3 - "$LAST_DEPLOY_AT" <<'PY'
-import datetime
-import sys
-
-last = sys.argv[1].strip()
-if last.endswith("Z"):
-    last = last[:-1] + "+00:00"
-dt = datetime.datetime.fromisoformat(last)
-now = datetime.datetime.now(datetime.timezone.utc)
-age = (now - dt).total_seconds() / 3600.0
-print(f"{age:.2f}")
-PY
-)"
+            AGE_HOURS="$(python3 -c 'import datetime,sys; last=sys.argv[1].strip(); last=last[:-1] + \"+00:00\" if last.endswith(\"Z\") else last; dt=datetime.datetime.fromisoformat(last); now=datetime.datetime.now(datetime.timezone.utc); print(f\"{(now-dt).total_seconds()/3600.0:.2f}\")' "$LAST_DEPLOY_AT")"
 
             echo "Last deploy: $LAST_DEPLOY_AT (${AGE_HOURS}h ago)"
-            should_delete="$(python3 - "$AGE_HOURS" "$TTL_HOURS" <<'PY'
-import sys
-age = float(sys.argv[1])
-ttl = float(sys.argv[2])
-print("1" if age >= ttl else "0")
-PY
-)"
+            should_delete="$(python3 -c 'import sys; age=float(sys.argv[1]); ttl=float(sys.argv[2]); print(\"1\" if age >= ttl else \"0\")' "$AGE_HOURS" "$TTL_HOURS")"
 
             if [ "$should_delete" = "1" ]; then
               echo "Deleting stale preview environment: $env_name"
