@@ -39,7 +39,8 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            APP_NAME="postloop-preview-pr-${{ github.event.pull_request.number }}"
+            SHORT_SHA="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+            APP_NAME="postloop-preview-pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
           elif [ -n "${{ inputs.app_name }}" ]; then
             APP_NAME="${{ inputs.app_name }}"
           else
@@ -192,17 +193,20 @@ jobs:
           MODAL_APP_NAME: ${{ steps.names.outputs.modal_app_name }}
           PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
           DEPLOYED: ${{ steps.deploy_state.outputs.deployed }}
+          COMMIT_SHA: ${{ github.sha }}
         with:
           script: |
             const marker = "<!-- postloop-modal-preview -->";
             const deployed = process.env.DEPLOYED === "true";
             const previewUrl = process.env.PREVIEW_URL || "";
+            const commit = (process.env.COMMIT_SHA || "").slice(0, 7);
             const body = [
               marker,
               "### Modal Preview",
               "",
               `- Status: ${deployed && previewUrl ? "ready" : "degraded"}`,
               `- App: \`${process.env.MODAL_APP_NAME}\``,
+              `- Commit: \`${commit || "unknown"}\``,
               `- URL: ${previewUrl || "(unavailable)"}`,
               deployed ? "- Deploy step: success" : "- Deploy step: failed (check workflow logs)",
               `- Workflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
@@ -248,7 +252,8 @@ jobs:
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
       MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
       MODAL_ENVIRONMENT: ${{ vars.MODAL_ENVIRONMENT }}
-      MODAL_APP_NAME: postloop-preview-pr-${{ github.event.pull_request.number }}
+      MODAL_APP_PREFIX: postloop-preview-pr-${{ github.event.pull_request.number }}-
+      MODAL_APP_LEGACY: postloop-preview-pr-${{ github.event.pull_request.number }}
     steps:
       - name: Validate Modal credentials
         id: modal_auth
@@ -273,6 +278,52 @@ jobs:
           python -m pip install --upgrade pip
           pip install modal
 
-      - name: Stop preview app
+      - name: Stop preview apps for PR
         if: steps.modal_auth.outputs.configured == 'true'
-        run: modal app stop "$MODAL_APP_NAME" || true
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          import sys
+
+          prefix = os.getenv("MODAL_APP_PREFIX", "").strip()
+          legacy = os.getenv("MODAL_APP_LEGACY", "").strip()
+          if not prefix and not legacy:
+              print("Missing Modal app prefix/name; skipping cleanup.")
+              raise SystemExit(0)
+
+          listed = subprocess.run(
+              ["modal", "app", "list", "--json"],
+              capture_output=True,
+              text=True,
+          )
+          if listed.returncode != 0:
+              print(listed.stdout)
+              print(listed.stderr, file=sys.stderr)
+              raise SystemExit(0)
+
+          try:
+              rows = json.loads(listed.stdout or "[]")
+          except json.JSONDecodeError:
+              rows = []
+
+          targets: list[str] = []
+          for row in rows:
+              name = str(row.get("Description", "")).strip()
+              if not name:
+                  continue
+              if (prefix and name.startswith(prefix)) or (legacy and name == legacy):
+                  targets.append(name)
+
+          if not targets:
+              print("No matching preview apps found.")
+              raise SystemExit(0)
+
+          for app_name in sorted(set(targets)):
+              print(f"Stopping Modal app: {app_name}")
+              subprocess.run(["modal", "app", "stop", app_name], check=False)
+          PY

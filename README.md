@@ -100,10 +100,11 @@ This template includes `.github/workflows/preview-modal.yml` for per-push PR pre
 
 Behavior:
 
-1. On PR `opened/synchronize/reopened`, workflow builds frontend, deploys `modal_app.py`, and updates one stable app name per PR (`postloop-preview-pr-<number>`).
-2. It resolves the preview URL and posts/updates a PR comment with that URL.
+1. On PR `opened/synchronize/reopened`, workflow builds frontend and deploys `modal_app.py` to a commit-scoped app name:
+   - `postloop-preview-pr-<number>-<shortsha>`
+2. It resolves the preview URL and posts/updates a PR comment with the current URL and commit.
 3. It runs Playwright E2E against the deployed preview (`PLAYWRIGHT_BASE_URL=<preview-url>`).
-4. On PR `closed`, it stops the corresponding Modal app.
+4. On PR `closed`, it stops all matching apps for that PR (`postloop-preview-pr-<number>-*`).
 
 Required repository secrets:
 
@@ -119,9 +120,25 @@ Notes:
 - `modal_app.py` serves backend APIs and frontend static assets from one Modal endpoint.
 - Frontend bundle must exist at `frontend/dist` before deploy; workflow handles this build step automatically.
 - Modal plan endpoint limits apply (for example, free tier caps deployed web endpoints), so stale previews should be cleaned up.
+- Preview URLs are unique per push because app names include the commit short SHA.
 - Remote E2E can also be run manually with:
 
 ```bash
 cd frontend
 PLAYWRIGHT_BASE_URL="https://<your-preview-url>" npm run test:e2e
+```
+
+## Manual Modal Cleanup
+
+Run this locally when you want to proactively clean old preview apps:
+
+```bash
+# dry run: show what would be stopped
+python3 scripts/cleanup_modal_previews.py --prefix postloop-preview-pr-
+
+# stop everything for one PR except the newest app
+python3 scripts/cleanup_modal_previews.py --pr-number 123 --keep-latest 1 --apply
+
+# stop all preview apps older than 4 hours
+python3 scripts/cleanup_modal_previews.py --prefix postloop-preview- --older-than-hours 4 --apply
 ```
